@@ -20,7 +20,7 @@ The framework integrates three major components:
 - SciPy
 - Scanpy, optional, for preprocessing single-cell data
 
-##Installation
+## Installation
 
 1. Clone this repository
 
@@ -40,7 +40,7 @@ conda activate scmorcel
 1.read data
 
 DATA_FORMAT = 'mtx'   # ← 在此切换: 'mtx' 或 'h5ad'
-DATASET_ID  = 9       # ← 在此切换数据集编号
+DATASET_ID  = 7       # ← 在此切换数据集编号
 
 MTX_DATASETS = {
     # ID: (数据目录, rna_mtx, rna_features, rna_barcodes, adt_csv, label_csv)
@@ -67,10 +67,10 @@ H5AD_DATASETS = {
 
 2.Run with scMORCEL
 
-score=scMORCEL(
-    test=None,
-    reference=None,
-    label=None,
+test_score, history = scMORCEL(
+    test=test,
+    reference=reference,
+    label=label,
     processing_unit="cuda",
     max_epochs=100,
     patience=10,
