@@ -7,7 +7,7 @@ scMORCEL, an **open-set representation learning framework** for novel rare cell 
 The framework integrates three major components:
 
 1. We formulate novel rare cell detection in single-cell multi-omics as an open-set recognition problem and propose scMORCEL, a unified framework that integrates open-set representation learning with novelty detection for discovering previously unseen cellular populations;
-2.We develop an open-set representation learning strategy that combines multi-head gene attention with supervised contrastive optimization to construct compact manifolds for known cell populations while preserving the separability of unseen cellular states in the latent space;
+2. We develop an open-set representation learning strategy that combines multi-head gene attention with supervised contrastive optimization to construct compact manifolds for known cell populations while preserving the separability of unseen cellular states in the latent space;
 3. We introduce a robust novelty estimation framework that jointly models distributional deviation and predictive uncertainty through statistically calibrated score fusion, effectively addressing the complementary failure modes of geometry-based and confidence-based open-set detection across diverse single-cell multi-omics datasets.
 
 ## Requirements
