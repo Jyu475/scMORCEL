@@ -20,52 +20,21 @@ The framework integrates three major components:
 - SciPy
 - Scanpy, optional, for preprocessing single-cell data
 
-## Installation
+## Datasets
 
-1. Clone this repository
+Example datasets used in the article can be downloaded from https://doi.org/10.6084/m9.figshare.32780442.
 
-```bash
-git clone https://github.com/Jyu475/scMORCEL
-cd scMORCEL
-```
+## Usage
 
-### 2. Create a conda environment
+Required objects in h5ad or mtx file for running scMORCEL
 
-```bash
-conda create -n scmorcel python=3.9
-conda activate scmorcel
-```
-## Run core
+1.ADT/ATAC count matrix
 
-1.read data
+2.mRNA count matrix
 
-DATA_FORMAT = 'mtx'   # ← 在此切换: 'mtx' 或 'h5ad'
-DATASET_ID  = 7       # ← 在此切换数据集编号
+3.True labels
 
-MTX_DATASETS = {
-    # ID: (数据目录, rna_mtx, rna_features, rna_barcodes, adt_csv, label_csv)
-    7: (
-        "Experiments/7_GSE194122_s3d6/",
-        "GSE194122_s3d6_matrix.mtx",
-        "GSE194122_s3d6_features.tsv",
-        "GSE194122_s3d6_barcodes.tsv",
-        "GSE194122_s3d6_ADT.csv",
-        "GSE194122_s3d6_label.csv",
-        None   # label_index_replace: None 表示不替换
-    ),
-}
-
-H5AD_DATASETS = {
-    # ID: (数据目录, rna_h5ad, adt_h5ad, label_csv)
-    1: (
-        "Experiments/1_10X1kpbmc/",
-        "10X1kpbmc_rna.h5ad",
-        "10X1kpbmc_adt.h5ad",
-        "10X1kpbmc_label.csv"
-    ),
-}
-
-2.Run with scMORCEL
+4.Run scMORCEL by following the scMORCEL_run.ipynb notebook in the “Experiments” folder.
 
 test_score, history = scMORCEL(
     test=test,
@@ -74,17 +43,6 @@ test_score, history = scMORCEL(
     processing_unit="cuda",
     max_epochs=100,
     patience=10,
-    model_type="attention",
-    attention_heads=4,
-    use_validation=True,
-    validation_split=0.1,
     learning_rate=1e-3,
-    score_function="mahalanobis_energy",
-    mahal_energy_alpha=0.5,
-    energy_temperature=1.0,
-    use_contrastive=True,
-    contrastive_weight=0.1,
-    contrastive_temperature=0.5,
-    contrastive_type="contrastive",
     verbose=True
 )
