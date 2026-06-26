@@ -3,23 +3,18 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-
 class ContrastiveLoss(nn.Module):
-    
     def __init__(self, temperature=0.5, base_temperature=0.07):
-
         super(ContrastiveLoss, self).__init__()
         self.temperature = temperature
         self.base_temperature = base_temperature
     
     def forward(self, features, labels):
-
         device = features.device
         batch_size = features.shape[0]
- 
+
         features = F.normalize(features, p=2, dim=1)
         
-
         labels = labels.contiguous().view(-1, 1)  # [batch_size, 1]
         
         mask = torch.eq(labels, labels.T).float().to(device)
@@ -53,6 +48,6 @@ def select_loss_function(loss_type, num_classes=None, feat_dim=None, device=None
         return ContrastiveLoss(temperature=temperature)
     
     else:
-        raise ValueError(f"未知的损失类型: {loss_type}")
+        raise ValueError(f""Unknown loss type": {loss_type}")
 
 
