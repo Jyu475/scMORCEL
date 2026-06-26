@@ -73,13 +73,13 @@ class GeneAttention(nn.Module):
             nn.Linear(input_size, hidden_dim),
             nn.ReLU(),
             nn.Linear(hidden_dim, input_size),
-            nn.Sigmoid()   # 输出范围 0~1
+            nn.Sigmoid()   
         )
 
     def forward(self, x):
-        attention_weights = self.attention(x)      # [B, G]
+        attention_weights = self.attention(x)     
         weighted = x * attention_weights
-        enhanced = x + weighted                   # 残差增强
+        enhanced = x + weighted                 
         return enhanced, attention_weights
 
 class MultiHeadGeneAttention(nn.Module):
@@ -108,7 +108,7 @@ class MultiHeadGeneAttention(nn.Module):
 
         fused = self.fusion(concatenated)
 
-        enhanced = fused + 0.3*x
+        enhanced = fused + x
 
         attention_weights = torch.stack(all_weights, dim=1)
 
