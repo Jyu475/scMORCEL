@@ -8,17 +8,14 @@ from scMORCEL.weightsampling import Weighted_Sampling
 import copy
 import pandas as pd
 from sklearn.model_selection import train_test_split
-
-# ========== 导入对比学习损失 ==========
 from scMORCEL.loss import ContrastiveLoss
 
-# ========== 尝试导入高级OOD方法 ==========
 try:
     from scMORCEL.score import combined_mahalanobis_energy
     ADVANCED_OOD_AVAILABLE = True
 except ImportError:
     ADVANCED_OOD_AVAILABLE = False
-    print("高级OOD方法不可用")
+    print("Advanced OOD method is not available.")
 
 def scMORCEL(
         test = None,
@@ -30,34 +27,28 @@ def scMORCEL(
         model_type='attention',
         attention_heads=4,
         use_validation=True,
-        validation_split=0.1,
+        validation_split=0.2,
         learning_rate=1e-3,
-        
-        # ========== 默认使用Mahalanobis+Energy ==========
-        score_function='mahalanobis_energy',  # 修改默认值
-        
-        mahal_energy_alpha=0.5,
+        score_function='mahalanobis_energy',  
+        mahal_energy_alpha=0.7,
         energy_temperature=1.0,
-        
-        # 对比学习相关参数
         use_contrastive=True,
         contrastive_weight=0.1,
         contrastive_temperature=0.5,
         contrastive_type='contrastive',
-
         verbose=True
     ):
     
     if len(reference) != len(label):
         raise ValueError(
-            f"训练集数据行数 {len(reference)} 与训练标签行数 {len(label)} 不匹配。"
+            f"The number of reference samples ({len(reference)}) does not match "
+            f"the number of labels ({len(label)})."
         )
 
     
-    # ========== 数据预处理 ==========
     if verbose:
         print("=" * 60)
-        print("开始数据预处理")
+        print("Starting data preprocessing")
         print("=" * 60)
 
     label = label.copy()
@@ -71,7 +62,6 @@ def scMORCEL(
     X_test = test.values
     y_train_full = label['transformed'].values
     
-    # ========== 划分训练集和验证集 ==========
     if use_validation:
         X_train, X_val, y_train, y_val = train_test_split(
             X_train_full,
@@ -82,9 +72,9 @@ def scMORCEL(
         )
         
         if verbose:
-            print(f"训练集样本数: {len(X_train)}")
-            print(f"验证集样本数: {len(X_val)}")
-            print(f"测试集样本数: {len(X_test)}")
+            print(f"Training samples: {len(X_train)}")
+            print(f"Validation samples: {len(X_val)}")
+            print(f"Test samples: {len(X_test)}")
     else:
         X_train = X_train_full
         y_train = y_train_full
@@ -92,10 +82,11 @@ def scMORCEL(
         y_val = None
         
         if verbose:
-            print(f"训练集样本数: {len(X_train)} (无验证集)")
-            print(f"测试集样本数: {len(X_test)}")
+            if verbose:
+            print(f"Training samples: {len(X_train)}")
+            print("Validation set: None")
+            print(f"Test samples: {len(X_test)}")
     
-    # 转换为 torch.Tensor
     dtype = torch.float
     X_train = torch.from_numpy(X_train).type(dtype)
     y_train = torch.from_numpy(y_train).type(torch.long)
@@ -104,8 +95,7 @@ def scMORCEL(
     if use_validation:
         X_val = torch.from_numpy(X_val).type(dtype)
         y_val = torch.from_numpy(y_val).type(torch.long)
-
-    # ========== 构建 DataLoader ==========
+        
     sampler = Weighted_Sampling(y_train)
     train_data = Data.TensorDataset(X_train, y_train)
     train_loader = Data.DataLoader(
@@ -131,43 +121,38 @@ def scMORCEL(
         num_workers=1
     )
 
-    # ========== 模型初始化 ==========
     input_size = X_train.shape[1]
     num_class = len(status_dict)
     
     if verbose:
-        print(f"\n模型配置:")
-        print(f"  - 输入特征数: {input_size}")
-        print(f"  - 类别数: {num_class}")
-        print(f"  - 模型类型: {model_type}")
+        print(f"\nModel configuration:")
+        print(f"  - Input features: {input_size}")
+        print(f"  - Number of classes: {num_class}")
+        print(f"  - Model type: {model_type}")
     
     if model_type == 'basic':
         model = classifier(input_size, num_class)
     elif model_type == 'attention':
         model = AttentionClassifier(input_size, num_class, attention_heads=attention_heads)
         if verbose:
-            print(f"  - 使用多头注意力分类器 (heads={attention_heads})")
+            print(f"  -  Using multi-head attention classifier (heads={attention_heads})")
     else:
-        raise ValueError(f"未知的模型类型: {model_type}")
+        raise ValueError(f"Unknown model type: {model_type}")
     
     criterion = nn.CrossEntropyLoss()
 
-    # 对比学习损失
     criterion_contrastive = None
     if use_contrastive:
-        device_for_loss = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        
         if contrastive_type == 'contrastive':
             criterion_contrastive = ContrastiveLoss(
                 temperature=contrastive_temperature
             )
             if verbose:
-                print(f"  ✓ 启用监督对比学习损失")
-                print(f"    - 权重: {contrastive_weight}")
-                print(f"    - 温度: {contrastive_temperature}")
-        
+                print("  - Supervised contrastive loss enabled")
+                print(f"    - Weight: {contrastive_weight}")
+                print(f"    - Temperature: {contrastive_temperature}")
         else:
-            raise ValueError(f"未知的对比学习类型: {contrastive_type}")
+            raise ValueError(f"Unknown contrastive loss type: {contrastive_type}")
     
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
@@ -179,7 +164,6 @@ def scMORCEL(
         min_lr=1e-6
     )
 
-    # ========== 设备选择 ==========
     if processing_unit == 'cpu':
         device = torch.device('cpu')
     elif processing_unit in ['gpu', 'cuda']:
@@ -188,14 +172,13 @@ def scMORCEL(
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
     if verbose:
-        print(f"  - 计算设备: {device}")
+        print(f"  - Device: {device}")
         print("\n" + "=" * 60)
-        print("开始训练")
+        print("Starting training")
         print("=" * 60)
     
     model.to(device)
-    
-     # ========== 训练循环 ==========
+
     best_val_loss = float('inf')
     best_model_state = None
     patience_counter = 0
@@ -212,7 +195,6 @@ def scMORCEL(
     start_time = time.time()
     
     for epoch in range(max_epochs):
-        # 训练阶段
         model.train()
         train_loss = 0.0
         train_loss_ce = 0.0
@@ -249,7 +231,6 @@ def scMORCEL(
         train_loss_ce /= train_batches
         train_loss_contrastive /= train_batches
         
-        # 验证阶段
         if use_validation:
             model.eval()
             val_loss = 0.0
@@ -299,16 +280,17 @@ def scMORCEL(
                 best_model_state = copy.deepcopy(model.state_dict())
                 patience_counter = 0
                 
-                if verbose and (epoch + 1) % 5 == 0:
-                    print(f"  ✓ 验证loss改善! 保存最佳模型")
             else:
                 patience_counter += 1
                 
                 if patience_counter >= patience:
                     if verbose:
-                        print(f"\n早停触发 (epoch {epoch+1})")
-                        print(f"  - 验证loss连续 {patience} 轮未改善")
-                        print(f"  - 最佳验证loss: {best_val_loss:.4f}")
+                        print(f"\nEarly stopping triggered at epoch {epoch + 1}.")
+                        print(
+                            f"  - Validation loss did not improve for "
+                            f"{patience} consecutive epochs."
+                        )
+                        print(f"  - Best validation loss: {best_val_loss:.4f}")
                     break
         else:
             training_history['train_loss'].append(train_loss)
@@ -326,25 +308,21 @@ def scMORCEL(
                     print(f"Epoch {epoch+1:3d}/{max_epochs} | "
                           f"Train: {train_loss:.4f}")
     
-    # 加载最佳模型
     if use_validation and best_model_state is not None:
         model.load_state_dict(best_model_state)
         if verbose:
-            print(f"\n✓ 已加载最佳模型 (验证loss: {best_val_loss:.4f})")
+            print(f"\nBest model loaded. Validation loss: {best_val_loss:.4f}")
     
     training_time = time.time() - start_time
     if verbose:
-        print(f"\n训练完成! 总耗时: {training_time:.2f} 秒")
+        print(f"\nTraining completed. Total time: {training_time:.2f} seconds")
         print("=" * 60)
     
-    # ========== OOD评分（只使用Mahalanobis+Energy）==========
     if verbose:
-        print(f"\n开始OOD评分 (方法: {score_function})...")
+        print(f"\nStarting OOD scoring. Method: {score_function}")
 
     model.eval()
 
-    
-    # 使用Mahalanobis + Energy组合方法
     test_score, components = combined_mahalanobis_energy(
         train_loader,
         test_loader,
@@ -356,13 +334,14 @@ def scMORCEL(
     )
 
     if verbose:
-        print("✓ OOD评分完成")
-        print(f"\n评分统计:")
-        print(f"  - 最小值: {test_score.min():.4f}")
-        print(f"  - 最大值: {test_score.max():.4f}")
-        print(f"  - 平均值: {test_score.mean():.4f}")
-        print(f"  - 标准差: {test_score.std():.4f}")
-        print(f"\n注意: 分数越高 → 越可能是正常细胞")
-        print(f"      分数越低 → 越可能是稀有细胞")
+        print("OOD scoring completed.")
+        print("\nScore statistics:")
+        print(f"  - Min: {test_score.min():.4f}")
+        print(f"  - Max: {test_score.max():.4f}")
+        print(f"  - Mean: {test_score.mean():.4f}")
+        print(f"  - Std: {test_score.std():.4f}")
+        print("\nNote:")
+        print("  - Higher scores indicate cells more likely to be known cells.")
+        print("  - Lower scores indicate cells more likely to be rare cells.")
 
     return test_score, training_history
