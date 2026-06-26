@@ -5,10 +5,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-
-# -----------------------------
-# Robust 标准化与 0-1 映射工具
-# -----------------------------
 def _robust_median_mad(x: np.ndarray):
     x = np.asarray(x).reshape(-1)
     med = np.median(x)
@@ -72,7 +68,10 @@ class MahalanobisDetector:
                     break
 
         if handle is None:
-            raise RuntimeError("无法为模型注册 hook（未找到合适的层），请检查模型结构。")
+            raise RuntimeError(
+             "Failed to register hooks for the model because no suitable layer was found. "
+             "Please check the model architecture."
+)
 
         with torch.no_grad():
             for batch_x, batch_y in data_loader:
@@ -88,7 +87,7 @@ class MahalanobisDetector:
         handle.remove()
 
         if len(features_list) == 0:
-            raise RuntimeError("无法提取特征，请检查模型结构或数据加载器输出。")
+            raise RuntimeError("Failed to extract features. Please check the model architecture or the output of the data loader.")
 
         features = np.vstack(features_list)
         labels = np.concatenate(labels_list)
@@ -97,16 +96,16 @@ class MahalanobisDetector:
     def fit(self, train_loader, model, device, verbose=True):
 
         if verbose:
-            print("\n[Mahalanobis] 提取训练集特征...")
+            print("\n[Mahalanobis] "Extracting training features..."")
 
         features, labels = self.extract_features(model, train_loader, device)
 
         if verbose:
-            print(f"  特征维度: {features.shape}")
+            print(f" Feature dimension: {features.shape}")
 
         self.num_classes = len(np.unique(labels))
         if verbose:
-            print(f"  类别数: {self.num_classes}")
+            print(f"  Number of classes: {self.num_classes}")
 
         class_features = {}
         for c in range(self.num_classes):
@@ -114,10 +113,7 @@ class MahalanobisDetector:
             class_features[c] = features[mask]
             self.class_means[c] = class_features[c].mean(axis=0)
             if verbose:
-                print(f"  类别 {c}: {class_features[c].shape[0]} 样本")
-
-        if verbose:
-            print("\n[Mahalanobis] 计算协方差矩阵...")
+                print(f"  Class {c}: {class_features[c].shape[0]} 样本")
 
         centered_features = []
         for c in range(self.num_classes):
@@ -132,17 +128,15 @@ class MahalanobisDetector:
 
         try:
             self.precision_matrix = np.linalg.inv(cov_matrix)
-            if verbose:
-                print(f"  ✓ 协方差矩阵维度: {cov_matrix.shape}")
+            
         except np.linalg.LinAlgError:
-            if verbose:
-                print("  ⚠️ 协方差矩阵奇异，使用伪逆")
+
             self.precision_matrix = np.linalg.pinv(cov_matrix)
 
     def compute_distances(self, data_loader, model, device, verbose=True):
 
         if verbose:
-            print("\n[Mahalanobis] 计算数据集距离...")
+            print("\n[Mahalanobis] Computing dataset distances...")
 
         features, _ = self.extract_features(model, data_loader, device)
 
@@ -162,8 +156,8 @@ class MahalanobisDetector:
         distances = np.array(distances)
 
         if verbose:
-            print(f"  距离范围: [{distances.min():.4f}, {distances.max():.4f}]")
-            print(f"  平均距离: {distances.mean():.4f}")
+            print(f"  Distance range: [{distances.min():.4f}, {distances.max():.4f}]")
+            print(f"  Average distance: {distances.mean():.4f}")
 
         return distances
 
@@ -172,7 +166,7 @@ class MahalanobisDetector:
 def compute_energy_score(data_loader, model, device, temperature=1.0, verbose=True):
 
     if verbose:
-        print("\n[Energy] 计算Energy分数...")
+        print("\n[Energy] Computing Energy scores...")
 
     model.eval()
     energy_scores = []
@@ -187,8 +181,8 @@ def compute_energy_score(data_loader, model, device, temperature=1.0, verbose=Tr
     energy_scores = np.array(energy_scores)
 
     if verbose:
-        print(f"  能量范围: [{energy_scores.min():.4f}, {energy_scores.max():.4f}]")
-        print(f"  平均能量: {energy_scores.mean():.4f}")
+        print(f"  Energy range: [{energy_scores.min():.4f}, {energy_scores.max():.4f}]")
+        print(f"  Average energy: {energy_scores.mean():.4f}")
 
     return energy_scores
 
@@ -206,7 +200,7 @@ def combined_mahalanobis_energy(
 
     if verbose:
         print("\n" + "=" * 60)
-        print("组合Mahalanobis + Energy OOD检测（Robust-Z + 0-1）")
+        print("Mahalanobis + Energy ")
         print("=" * 60)
 
     mahal_detector = MahalanobisDetector()
@@ -223,9 +217,6 @@ def combined_mahalanobis_energy(
 
     e_id_train = -energy_train
     e_id_test = -energy_test
-
-    if verbose:
-        print("\n[Robust-Z] 计算训练集 median/MAD 并标准化...")
 
     med_m, mad_m = _robust_median_mad(m_id_train)
     med_e, mad_e = _robust_median_mad(e_id_train)
@@ -245,7 +236,7 @@ def combined_mahalanobis_energy(
     combined_score = _sigmoid_to_01(z_combined)
 
     if verbose:
-        print(f"\n[组合] 权重: Mahalanobis={alpha:.2f}, Energy={1-alpha:.2f}")
+        print(f"\n"Weight": Mahalanobis={alpha:.2f}, Energy={1-alpha:.2f}")
         print(f"  Mahalanobis(z) : mean={z_m_test.mean():.4f}, std={z_m_test.std():.4f}")
         print(f"  Energy(z)      : mean={z_e_test.mean():.4f}, std={z_e_test.std():.4f}")
         print(f"  Combined(z)    : mean={z_combined.mean():.4f}, std={z_combined.std():.4f}")
